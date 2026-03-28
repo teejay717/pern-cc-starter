@@ -1,6 +1,7 @@
 import express from "express";
 import { db } from "./db.js";
 import { cars } from "./schema.js";
+import { eq } from "drizzle-orm";
 
 const app = express();
 const PORT = 3000;
@@ -39,33 +40,34 @@ router.post("/cars", async (req, res) => {
   res.status(201).json(newCar);
 });
 
-router.put("/cars/:id", (req, res) => {
+// update
+router.put("/cars/:id", async (req, res) => {
   const carId = parseInt(req.params.id);
-  const carIndex = cars.findIndex((c) => c.id === carId);
+  const [car] = await db.select().from(cars).where(eq(cars.id, carId));
 
-  if (carIndex === -1) {
+  if (!car) {
     return res.status(404).json({ error: "Car not found" });
   }
 
   const { make, model, year, price } = req.body;
 
-  if (make) cars[carIndex].make = make;
-  if (model) cars[carIndex].model = model;
-  if (year) cars[carIndex].year = parseInt(year);
-  if (price) cars[carIndex].price = parseFloat(price);
+  const updatedCar = await db.update(cars).set({ make: make, model: model, year: year, price: price }).where(eq(cars.id, carId)).returning();
 
-  res.json(cars[carIndex]);
+  res.json(updatedCar);
 });
 
-router.delete("/cars/:id", (req, res) => {
-  const carId = parseInt(req.params.id);
-  const carIndex = cars.findIndex((c) => c.id === carId);
 
-  if (carIndex === -1) {
+// Delete specific car by ID
+router.delete("/cars/:id", async (req, res) => {  
+  const carId = parseInt(req.params.id);
+  const [car] = await db.select().from(cars).where(eq(cars.id, carId));
+
+  if (!car) {
     return res.status(404).json({ error: "Car not found" });
   }
 
-  const deletedCar = cars.splice(carIndex, 1)[0];
+  const [deletedCar] = await db.delete(cars).where(eq(cars.id, carId)).returning();
+
 
   res.json({
     message: "Car deleted successfully",
